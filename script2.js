@@ -1,441 +1,297 @@
+"use strict";
+const $ = s => document.querySelector(s);
+const h = (tag, props = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) (k in e) ? (e[k] = v) : e.setAttribute(k, v);
+    e.append(...kids);
+    return e;
+};
 
-const searchForm = document.getElementById("searchForm");
-const productInput = document.getElementById("productInput");
-const resultsContainer = document.getElementById("resultsContainer");
-const resultTitle = document.getElementById("resultTitle");
-const resultCount = document.getElementById("resultCount");
-const searchMessage = document.getElementById("searchMessage");
+const store_ = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } }
+};
 
-// Retailer search links. These are not live price APIs.
+const inr = n => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+const enc = encodeURIComponent;
+const viaGoogle = d => q => `https://www.google.com/search?q=${enc(q + " site:" + d)}`;
+
+/* ---------- Verified Indian Retail Stores Database ---------- */
 const stores = [
-    {
-        name: "Amazon India",
-        icon: "A",
-        category: "General",
-        priority: "Essential",
-        description: "General shopping and everyday products",
-        makeUrl: q => `https://www.amazon.in/s?k=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Flipkart",
-        icon: "F",
-        category: "General",
-        priority: "Essential",
-        description: "General shopping and electronics",
-        makeUrl: q => `https://www.flipkart.com/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Meesho",
-        icon: "M",
-        category: "Budget shopping",
-        priority: "Essential",
-        description: "Affordable products and deals",
-        makeUrl: q => `https://www.meesho.com/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Snapdeal",
-        icon: "S",
-        category: "General",
-        priority: "Medium",
-        description: "Budget-friendly general shopping",
-        makeUrl: q => `https://www.snapdeal.com/search?keyword=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Shopsy",
-        icon: "S",
-        category: "Budget shopping",
-        priority: "Medium",
-        description: "Affordable products and fashion",
-        makeUrl: q => `https://www.shopsy.in/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Tata CLiQ",
-        icon: "T",
-        category: "General",
-        priority: "High",
-        description: "Fashion, electronics and lifestyle",
-        makeUrl: q => `https://www.tatacliq.com/search/?searchCategory=all&text=${encodeURIComponent(q)}`
-    },
-    {
-        name: "JioMart",
-        icon: "J",
-        category: "General",
-        priority: "Medium",
-        description: "Everyday shopping and groceries",
-        makeUrl: q => `https://www.jiomart.com/search/${encodeURIComponent(q)}`
-    },
-    {
-        name: "Croma",
-        icon: "C",
-        category: "Electronics",
-        priority: "Essential",
-        description: "Smartphones, laptops and electronics",
-        makeUrl: q => `https://www.croma.com/searchB?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Reliance Digital",
-        icon: "R",
-        category: "Electronics",
-        priority: "High",
-        description: "Electronics and home appliances",
-        makeUrl: q => `https://www.reliancedigital.in/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Vijay Sales",
-        icon: "V",
-        category: "Electronics",
-        priority: "High",
-        description: "Electronics and gadgets",
-        makeUrl: q => `https://www.vijaysales.com/search?search=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Myntra",
-        icon: "M",
-        category: "Fashion",
-        priority: "Medium",
-        description: "Clothing, footwear and accessories",
-        makeUrl: q => `https://www.myntra.com/${encodeURIComponent(q)}`
-    },
-    {
-        name: "AJIO",
-        icon: "A",
-        category: "Fashion",
-        priority: "Medium",
-        description: "Fashion and lifestyle",
-        makeUrl: q => `https://www.ajio.com/search/?text=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Nykaa",
-        icon: "N",
-        category: "Beauty",
-        priority: "Medium",
-        description: "Beauty, skincare and personal care",
-        makeUrl: q => `https://www.nykaa.com/search/result/?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Decathlon",
-        icon: "D",
-        category: "Sports products",
-        priority: "Medium",
-        description: "Sports, fitness and outdoor equipment",
-        makeUrl: q => `https://www.decathlon.in/search?query=${encodeURIComponent(q)}`
-    },
-    {
-        name: "FirstCry",
-        icon: "F",
-        category: "Baby products",
-        priority: "Medium",
-        description: "Baby care, toys and children's products",
-        makeUrl: q => `https://www.firstcry.com/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Lenskart",
-        icon: "L",
-        category: "Eyewear",
-        priority: "Medium",
-        description: "Eyeglasses, sunglasses and lenses",
-        makeUrl: q => `https://www.lenskart.com/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Pepperfry",
-        icon: "P",
-        category: "Furniture",
-        priority: "Medium",
-        description: "Furniture and home decor",
-        makeUrl: q => `https://www.pepperfry.com/site_product/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Urban Ladder",
-        icon: "U",
-        category: "Furniture",
-        priority: "Medium",
-        description: "Furniture and home furnishings",
-        makeUrl: q => `https://www.urbanladder.com/search?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "BigBasket",
-        icon: "B",
-        category: "Groceries",
-        priority: "Medium",
-        description: "Groceries and household essentials",
-        makeUrl: q => `https://www.bigbasket.com/ps/?q=${encodeURIComponent(q)}`
-    },
-    {
-        name: "IndiaMART",
-        icon: "I",
-        category: "Wholesale products",
-        priority: "Medium",
-        description: "Wholesale and business products",
-        makeUrl: q => `https://dir.indiamart.com/search.mp?ss=${encodeURIComponent(q)}`
-    },
-    {
-        name: "Google Shopping",
-        icon: "G",
-        category: "Product discovery",
-        priority: "High",
-        description: "Discover products from multiple retailers",
-        makeUrl: q => `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(q)}`
-    }
+    { name: "Amazon India", domain: "amazon.in", group: "General", trust: 5, ops: true, desc: "Massive catalog with reliable fulfillment & fast returns.", cats: ["phone", "laptop", "tablet", "watch", "audio", "tv", "appliance", "fashion", "footwear", "beauty", "grocery"], url: q => `https://www.amazon.in/s?k=${enc(q)}` },
+    { name: "Flipkart", domain: "flipkart.com", group: "General", trust: 5, desc: "Market leader for electronics, smartphones, and fashion.", cats: ["phone", "laptop", "tablet", "watch", "audio", "tv", "appliance", "fashion", "footwear"], url: q => `https://www.flipkart.com/search?q=${enc(q)}` },
+    { name: "Myntra", domain: "myntra.com", group: "Fashion", trust: 5, desc: "India's premier dedicated fashion & lifestyle destination.", cats: ["fashion", "footwear"], url: q => `https://www.myntra.com/${enc(q.trim().replace(/\s+/g, "-"))}` },
+    { name: "AJIO", domain: "ajio.com", group: "Fashion", trust: 4, desc: "Curated trendy apparel, streetwear, and exclusive labels.", cats: ["fashion", "footwear"], url: q => `https://www.ajio.com/search/?text=${enc(q)}` },
+    { name: "Tata CLiQ", domain: "tatacliq.com", group: "General", trust: 4, desc: "Authentic branded electronics, luxury, and fashion goods.", cats: ["fashion", "footwear", "phone", "beauty"], url: q => `https://www.tatacliq.com/search/?searchCategory=all&text=${enc(q)}` },
+    { name: "Nykaa", domain: "nykaa.com", group: "Beauty", trust: 5, desc: "The authority for makeup, skincare, and wellness products.", cats: ["beauty"], url: q => `https://www.nykaa.com/search/result/?q=${enc(q)}` },
+    { name: "Meesho", domain: "meesho.com", group: "Budget", trust: 3, desc: "Ultra low-cost everyday essentials and apparel.", cats: ["fashion"], url: q => `https://www.meesho.com/search?q=${enc(q)}` },
+    { name: "Shopsy", domain: "shopsy.in", group: "Budget", trust: 3, desc: "Budget-friendly value shopping powered by Flipkart.", cats: ["fashion"], via: true, url: viaGoogle("shopsy.in") },
+    { name: "Croma", domain: "croma.com", group: "Electronics", trust: 5, desc: "Trusted Tata omnichannel electronics superstore.", cats: ["phone", "laptop", "tablet", "watch", "audio", "tv", "appliance"], url: q => `https://www.croma.com/searchB?q=${enc(q)}` },
+    { name: "Reliance Digital", domain: "reliancedigital.in", group: "Electronics", trust: 4, desc: "Massive selection of home appliances and tech gadgets.", cats: ["phone", "laptop", "audio", "tv", "appliance"], via: true, url: viaGoogle("reliancedigital.in") },
+    { name: "Vijay Sales", domain: "vijaysales.com", group: "Electronics", trust: 4, desc: "Renowned consumer electronics and gadget retailer.", cats: ["phone", "laptop", "audio", "tv", "appliance"], via: true, url: viaGoogle("vijaysales.com") },
+    { name: "Decathlon", domain: "decathlon.in", group: "Sports", trust: 5, desc: "Incomparable gear for sports, fitness, and outdoor activities.", cats: ["sports", "footwear"], via: true, url: viaGoogle("decathlon.in") },
+    { name: "BigBasket", domain: "bigbasket.com", group: "Grocery", trust: 5, desc: "Comprehensive online supermarket for household groceries.", cats: ["grocery"], url: q => `https://www.bigbasket.com/ps/?q=${enc(q)}` },
+    { name: "JioMart", domain: "jiomart.com", group: "Grocery", trust: 4, desc: "Groceries, daily essentials, and home appliances.", cats: ["grocery", "appliance"], via: true, url: viaGoogle("jiomart.com") },
+    { name: "FirstCry", domain: "firstcry.com", group: "Baby", trust: 5, desc: "Asia's largest online store for baby care and kids toys.", cats: ["baby"], url: q => `https://www.firstcry.com/search?q=${enc(q)}` },
+    { name: "Lenskart", domain: "lenskart.com", group: "Eyewear", trust: 5, desc: "Direct-to-consumer eyewear, sunglasses, and contact lenses.", cats: ["eyewear"], via: true, url: viaGoogle("lenskart.com") },
+    { name: "Pepperfry", domain: "pepperfry.com", group: "Furniture", trust: 4, desc: "Extensive marketplace for furniture and interior decor.", cats: ["furniture"], url: q => `https://www.pepperfry.com/site_product/search?q=${enc(q)}` },
+    { name: "Urban Ladder", domain: "urbanladder.com", group: "Furniture", trust: 4, desc: "Design-led premium furniture and wooden home decor.", cats: ["furniture"], via: true, url: viaGoogle("urbanladder.com") },
+    { name: "Snapdeal", domain: "snapdeal.com", group: "Budget", trust: 3, desc: "Value-focused general e-commerce marketplace.", cats: [], url: q => `https://www.snapdeal.com/search?keyword=${enc(q)}` },
+    { name: "IndiaMART", domain: "indiamart.com", group: "Wholesale", trust: 3, desc: "B2B wholesale marketplace and bulk buyer hub.", cats: [], url: q => `https://dir.indiamart.com/search.mp?ss=${enc(q)}` },
+    { name: "Google Shopping", domain: "google.com", group: "Discovery", trust: 4, ops: true, desc: "Multi-retailer price aggregator engine.", cats: ["*"], url: q => `https://www.google.com/search?tbm=shop&q=${enc(q)}` }
 ];
 
-// Accessory words help avoid treating a phone cover as a phone.
-const accessoryTerms = [
-    "case",
-    "cover",
-    "back cover",
-    "screen guard",
-    "screen protector",
-    "tempered glass",
-    "charger",
-    "charging cable",
-    "phone holder",
-    "phone skin",
-    "mobile skin",
-    "replacement strap",
-    "watch strap",
-    "earbud case",
-    "laptop sleeve",
-    "laptop bag"
+/* ---------- Intelligent Category Mapping ---------- */
+const accessories = /\b(case|cover|back cover|screen guard|screen protector|tempered glass|charger|charging cable|phone holder|skin|strap|sleeve|laptop bag)\b/i;
+const types = [
+    { key: "phone", label: "Smartphones", re: /\b(iphone|galaxy s\d+|galaxy a\d+|samsung galaxy|oneplus|redmi|poco|realme|oppo|vivo|motorola|moto g|pixel \d+|nothing phone|iqoo|smartphone|mobile phone)\b/i, ex: "-case -cover -charger -screen -glass -skin" },
+    { key: "laptop", label: "Laptops & PCs", re: /\b(laptop|macbook|notebook|chromebook|thinkpad|vivobook|zenbook|ideapad|pavilion)\b/i, ex: "-bag -sleeve -skin -cover" },
+    { key: "tablet", label: "Tablets", re: /\b(ipad|tablet|galaxy tab|oneplus pad|xiaomi pad)\b/i, ex: "-case -cover -glass" },
+    { key: "watch", label: "Smartwatches", re: /\b(smartwatch|apple watch|galaxy watch|amazfit|noise watch)\b/i, ex: "-strap -band -case" },
+    { key: "audio", label: "Audio Gear", re: /\b(earbuds|airpods|headphones|headset|galaxy buds|oneplus buds|speaker|soundbar)\b/i, ex: "-case -tips" },
+    { key: "tv", label: "Televisions", re: /\b(tv|television|smart tv|led tv|oled)\b/i, ex: "" },
+    { key: "appliance", label: "Appliances", re: /\b(refrigerator|fridge|washing machine|air conditioner|split ac|window ac|microwave|geyser|air fryer|vacuum cleaner|mixer grinder)\b/i, ex: "" },
+    { key: "footwear", label: "Footwear", re: /\b(shoes?|sneakers?|sandals?|slippers?|heels|boots?|loafers|flip flops)\b/i, ex: "" },
+    { key: "fashion", label: "Fashion & Apparel", re: /\b(shirts?|t-?shirts?|tees?|jeans|trousers|pants|dress|kurta|kurti|saree|lehenga|hoodie|jacket|sweater|shorts|leggings|clothes|clothing|ethnic wear|innerwear|jersey)\b/i, ex: "" },
+    { key: "sports", label: "Sports & Fitness", re: /\b(cricket bat|football|yoga mat|dumbbells?|badminton|treadmill)\b/i, ex: "" },
+    { key: "grocery", label: "Grocery", re: /\b(grocery|groceries|rice|atta|flour|milk|eggs|vegetables|fruits|dal)\b/i, ex: "" },
+    { key: "furniture", label: "Furniture", re: /\b(sofa|bed|mattress|dining table|chair|wardrobe|bookshelf|furniture|desk)\b/i, ex: "" },
+    { key: "beauty", label: "Beauty & Care", re: /\b(skincare|moisturi[sz]er|sunscreen|makeup|lipstick|perfume|shampoo|serum|face wash)\b/i, ex: "" },
+    { key: "eyewear", label: "Eyewear", re: /\b(eyeglasses|spectacles|sunglasses|contact lenses)\b/i, ex: "" },
+    { key: "baby", label: "Baby Products", re: /\b(baby|diapers?|stroller)\b/i, ex: "" }
 ];
 
-// Product-category detector.
-const productTypes = [
-    {
-        category: "Smartphone",
-        pattern: /\b(iphone|samsung galaxy|galaxy s\d|galaxy a\d|oneplus|xiaomi|redmi|poco|realme|oppo|vivo|motorola|moto g|google pixel|pixel \d|nothing phone|iqoo|infinix|tecno)\b/i,
-        storeCategories: ["Electronics", "General", "Product discovery"],
-        exclusions: "-case -cover -charger -screen protector -tempered glass -skin -accessory -accessories"
-    },
-    {
-        category: "Laptop",
-        pattern: /\b(laptop|macbook|notebook|chromebook|thinkpad|vivobook|zenbook|ideapad|pavilion)\b/i,
-        storeCategories: ["Electronics", "General", "Product discovery"],
-        exclusions: "-bag -sleeve -skin -cover -charger"
-    },
-    {
-        category: "Tablet",
-        pattern: /\b(ipad|tablet|galaxy tab|oneplus pad|xiaomi pad)\b/i,
-        storeCategories: ["Electronics", "General", "Product discovery"],
-        exclusions: "-case -cover -screen protector -tempered glass"
-    },
-    {
-        category: "Smartwatch",
-        pattern: /\b(smartwatch|apple watch|galaxy watch|amazfit|noise watch)\b/i,
-        storeCategories: ["Electronics", "General", "Product discovery"],
-        exclusions: "-strap -band -case -screen protector"
-    },
-    {
-        category: "Headphones and earbuds",
-        pattern: /\b(earbuds|airpods|headphones|headset|oneplus buds|galaxy buds|nothing ear)\b/i,
-        storeCategories: ["Electronics", "General", "Product discovery"],
-        exclusions: "-case -replacement tips -ear tips"
-    },
-    {
-        category: "Shoes and sportswear",
-        pattern: /\b(shoes|sneakers|running shoes|sports shoes|football boots|jersey)\b/i,
-        storeCategories: ["Fashion", "Sports products", "General", "Product discovery"],
-        exclusions: ""
-    },
-    {
-        category: "Groceries",
-        pattern: /\b(grocery|groceries|rice|atta|flour|milk|eggs|vegetables|fruits|oil)\b/i,
-        storeCategories: ["Groceries", "General", "Product discovery"],
-        exclusions: ""
-    },
-    {
-        category: "Furniture",
-        pattern: /\b(sofa|bed|mattress|dining table|chair|wardrobe|bookshelf|furniture)\b/i,
-        storeCategories: ["Furniture", "General", "Product discovery"],
-        exclusions: ""
-    },
-    {
-        category: "Beauty",
-        pattern: /\b(skincare|moisturizer|sunscreen|makeup|lipstick|perfume|shampoo|serum)\b/i,
-        storeCategories: ["Beauty", "General", "Product discovery"],
-        exclusions: ""
-    },
-    {
-        category: "Eyewear",
-        pattern: /\b(eyeglasses|spectacles|sunglasses|contact lenses)\b/i,
-        storeCategories: ["Eyewear", "General", "Product discovery"],
-        exclusions: ""
-    },
-    {
-        category: "Baby products",
-        pattern: /\b(baby|diapers|diaper|baby stroller|baby food|baby toys)\b/i,
-        storeCategories: ["Baby products", "General", "Product discovery"],
-        exclusions: ""
-    }
-];
-
-function getSearchQuery(input) {
-    const value = input.trim();
-
-    // Plain product name.
-    if (!/^https?:\/\//i.test(value)) {
-        return value;
-    }
-
-    // Best-effort extraction from a product URL.
+function parseInput(input) {
+    const v = input.trim();
+    if (!/^https?:\/\//i.test(v)) return v.replace(/\s+/g, " ");
     try {
-        const url = new URL(value);
-        const slug = url.pathname.split("/").filter(Boolean).pop() || "";
-
-        const readable = decodeURIComponent(slug)
-            .replace(/\.(html?|php)$/i, "")
-            .replace(/[-_]+/g, " ")
-            .replace(/\b\d{8,}\b/g, "")
-            .trim();
-
-        // Some product URLs contain only an ID. Do not pretend that
-        // the ID identifies the exact product.
-        return readable || url.hostname.replace(/^www\./, "");
-    } catch {
-        throw new Error(
-            "That URL doesn't look valid. Paste a full link starting with https://"
-        );
-    }
+        const u = new URL(v);
+        for (const k of ["q", "k", "query", "text", "keyword", "search", "ss"]) if (u.searchParams.get(k)) return u.searchParams.get(k).trim();
+        const skip = /^(dp|p|pd|itm|buy|product|products|gp|ref)$/i, isId = w => /^(?=.*\d)[a-z0-9]{9,}$/i.test(w);
+        const words = s => decodeURIComponent(s).replace(/\.(html?|php)$/i, "").split(/[-_+]+/).filter(w => w && !skip.test(w) && !isId(w));
+        const segs = u.pathname.split("/").filter(Boolean).filter(s => !/^ref=/i.test(s));
+        const best = segs.map(words).sort((a, b) => b.length - a.length)[0] || [];
+        if (best.length < 2 || !best.some(w => /[a-z]/i.test(w))) throw 0;
+        return best.join(" ");
+    } catch { throw new Error("Couldn't read a product name from that link. Type the product name instead."); }
 }
 
-function detectProduct(query) {
-    const normalized = query.toLowerCase();
+function detect(q) {
+    if (accessories.test(q)) return { key: "accessory", label: "Accessory", ex: "", msg: "Accessory search. Matching exact item compatibility." };
+    const t = types.find(t => t.re.test(q));
+    return t ? { ...t, msg: `${t.label} detected. Category specialists & top-rated stores are prioritized first.` }
+        : { key: "", label: "General product", ex: "", msg: "Broad multi-category marketplaces prioritized." };
+}
 
-    // If the user specifically searches for an accessory,
-    // do not remove that word from their search.
-    const isExplicitAccessory = accessoryTerms.some(term => {
-        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        return new RegExp(`\\b${escaped}\\b`, "i").test(normalized);
-    });
+const fit = (s, key) => (s.cats.includes(key) ? 25 : s.cats.includes("*") ? 10 : 0);
+const score = (s, key) => fit(s, key) + (s.trust * 2);
 
-    if (isExplicitAccessory) {
-        return {
-            category: "Accessory",
-            storeCategories: [
-                "Electronics",
-                "Fashion",
-                "General",
-                "Product discovery"
-            ],
-            searchQuery: query,
-            message: "Accessory search detected. Searching for the accessory you entered."
-        };
-    }
+/* ---------- App State ---------- */
+const S = { query: "", det: null, group: "All", manual: null, sort: "rec", prices: store_.get("sd_prices", {}) };
+const pkey = () => S.query.toLowerCase().replace(/\s+/g, " ").trim();
+const history_ = name => (S.prices[pkey()] || {})[name] || [];
 
-    const detected = productTypes.find(item =>
-        item.pattern.test(query)
+/* ---------- UI Rendering ---------- */
+function logo(s, cls = "logo-box") {
+    const box = h("span", { class: cls, "aria-hidden": "true" });
+    const img = h("img", { src: `https://www.google.com/s2/favicons?domain=${s.domain}&sz=64`, alt: "", loading: "lazy", width: 30, height: 30 });
+    img.onerror = () => { box.textContent = s.name[0]; };
+    box.append(img);
+    return box;
+}
+
+function card(s, rank) {
+    const topPick = S.det.key && rank < 3 && fit(s, S.det.key) > 0;
+    const hist = history_(s.name), last = hist[hist.length - 1];
+    const input = h("input", { type: "number", inputMode: "decimal", min: "1", step: "any", placeholder: "Price seen (₹)", "aria-label": `Price on ${s.name}` });
+    const save = () => addPrice(s.name, input.value);
+    input.onkeydown = e => { if (e.key === "Enter") save(); };
+
+    return h("article", { class: "store-card" + (topPick ? " top" : "") },
+        h("div", { class: "store-top" },
+            logo(s),
+            h("div", {},
+                h("h3", {}, s.name),
+                h("div", { class: "meta" }, `${s.group} · Trust ${s.trust}/5`)
+            ),
+            topPick ? h("span", { class: "badge" }, "Top Pick") : ""
+        ),
+        h("p", { class: "desc" }, s.desc),
+        last ? h("div", { class: "last" }, h("b", {}, inr(last.p)), ` saved on ${new Date(last.t).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`) : "",
+        h("details", { class: "track" },
+            h("summary", {}, last ? "Update price" : "Log price quote"),
+            h("div", { class: "price-row" }, input, h("button", { type: "button", onclick: save }, "Save"))
+        ),
+        h("a", { class: "open", href: s.url(S.query), target: "_blank", rel: "noopener noreferrer" }, s.via ? "Search store via Google ↗️" : "Open store ↗️")
     );
-
-    if (!detected) {
-        return {
-            category: "General product",
-            storeCategories: [
-                "General",
-                "Product discovery",
-                "Budget shopping"
-            ],
-            searchQuery: query,
-            message: "No specific category was confidently detected. General stores are shown first."
-        };
-    }
-
-    return {
-        category: detected.category,
-        storeCategories: detected.storeCategories,
-        searchQuery: detected.exclusions
-            ? `${query} ${detected.exclusions}`
-            : query,
-        message: `${detected.category} detected. Relevant store categories are shown first.`
-    };
 }
 
-function createStoreCard(store, query) {
-    const card = document.createElement("article");
-    card.className = "store-card";
-
-    const top = document.createElement("div");
-    top.className = "store-top";
-
-    const icon = document.createElement("div");
-    icon.className = "store-icon";
-    icon.textContent = store.icon;
-
-    const status = document.createElement("span");
-    status.className = "store-status";
-    status.textContent = store.priority;
-
-    top.append(icon, status);
-
-    const heading = document.createElement("h3");
-    heading.textContent = store.name;
-
-    const category = document.createElement("p");
-    category.className = "store-category";
-    category.textContent = store.category;
-
-    const description = document.createElement("p");
-    description.textContent = store.description;
-
-    const link = document.createElement("a");
-    link.href = store.makeUrl(query);
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = "Explore Products ↗";
-
-    card.append(top, heading, category, description, link);
-
-    return card;
+function visibleStores() {
+    const key = S.det.key;
+    let list = stores.filter(s => S.group === "All" || s.group === S.group);
+    const by = {
+        rec: (a, b) => score(b, key) - score(a, key),
+        trust: (a, b) => b.trust - a.trust || score(b, key) - score(a, key),
+        az: (a, b) => a.name.localeCompare(b.name)
+    }[S.sort];
+    return list.sort(by);
 }
 
-function searchProducts(input) {
-    let query;
+function setCat(k) {
+    const t = types.find(t => t.key === k);
+    S.manual = k;
+    S.det = t ? { ...t, msg: `Showing curated stores for ${t.label}.` } : detect(S.query);
+    render();
+}
 
-    try {
-        query = getSearchQuery(input);
-    } catch (error) {
-        searchMessage.textContent = error.message;
-        return;
+function render() {
+    const list = visibleStores();
+    $("#resultTitle").textContent = `Stores for “${S.query}”`;
+    $("#resultCount").textContent = `${list.length} stores available`;
+    $("#searchMessage").textContent = `${S.det.msg} Every platform is searched for exact product keywords.`;
+
+    $("#toolbar").hidden = false;
+    const cats = $("#cats");
+    cats.hidden = false;
+
+    const cb = (label, on, fn) => h("button", { class: "chip", type: "button", "aria-pressed": String(on), onclick: fn }, label);
+    cats.replaceChildren(cb("Auto-Detect", !S.manual, () => setCat(null)), ...types.map(t => cb(t.label, S.manual === t.key, () => setCat(t.key))));
+
+    const groups = ["All", ...new Set(stores.map(s => s.group))];
+    $("#filters").replaceChildren(...groups.map(g => h("button", { class: "chip", type: "button", "aria-pressed": String(g === S.group), onclick: () => { S.group = g; render(); } }, g)));
+
+    $("#resultsContainer").replaceChildren(...list.map((s, i) => card(s, i)));
+    renderCompare();
+}
+
+function renderCompare() {
+    const rows = stores.map(s => ({ s, last: history_(s.name).slice(-1)[0] })).filter(r => r.last).sort((a, b) => a.last.p - b.last.p);
+    const box = $("#comparePanel");
+    box.hidden = rows.length === 0;
+    if (!rows.length) return;
+
+    const low = rows[0].last.p;
+    box.replaceChildren(
+        h("header", {},
+            h("h3", {}, "Live Price Comparison Matrix"),
+            h("button", { class: "link-btn", type: "button", onclick: openHistory }, "View Price History Graph 📈")
+        ),
+        h("ol", {}, ...rows.map((r, i) => h("li", { class: i === 0 ? "best" : "" },
+            logo(r.s),
+            h("span", {}, r.s.name),
+            h("b", {}, inr(r.last.p)),
+            h("span", { class: "diff" }, i === 0 ? (rows.length > 1 ? "Lowest Price ⭐" : "Logged Price") : `+${inr(r.last.p - low)}`)
+        )))
+    );
+}
+
+function addPrice(name, raw) {
+    const p = Math.round(parseFloat(raw) * 100) / 100;
+    if (!(p > 0)) { $("#searchMessage").textContent = "Please enter a valid numeric price (e.g. 1499)."; return; }
+    const k = pkey();
+    ((S.prices[k] ??= {})[name] ??= []).push({ p, t: Date.now() });
+    store_.set("sd_prices", S.prices);
+    render();
+}
+
+/* ---------- SVG Price History Graph ---------- */
+const palette = ["#5eead4", "#f59e0b", "#60a5fa", "#f472b6", "#a78bfa", "#fb7185", "#84cc16", "#22d3ee"];
+function openHistory() {
+    const data = stores.map(s => ({ name: s.name, pts: history_(s.name) })).filter(d => d.pts.length);
+    const body = $("#histBody");
+    $("#histTitle").textContent = `Price History: ${S.query}`;
+
+    if (!data.length) {
+        body.replaceChildren(h("p", { class: "note" }, "No price data logged yet. Save a price quote on any merchant card to build history."));
+    } else {
+        data.forEach((d, i) => d.c = palette[i % palette.length]);
+        const W = 640, H = 280, m = { l: 65, r: 20, t: 15, b: 35 };
+        const all = data.flatMap(d => d.pts);
+        let lo = Math.min(...all.map(x => x.p)), hi = Math.max(...all.map(x => x.p));
+        if (lo === hi) { lo *= .92; hi *= 1.08; }
+        let t0 = Math.min(...all.map(x => x.t)), t1 = Math.max(...all.map(x => x.t));
+        if (t0 === t1) { t0 -= 864e5; t1 += 864e5; }
+
+        const X = t => m.l + (t - t0) / (t1 - t0) * (W - m.l - m.r);
+        const Y = p => H - m.b - (p - lo) / (hi - lo) * (H - m.t - m.b);
+        const dFmt = t => new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+        let svg = "";
+        for (let i = 0; i <= 3; i++) {
+            const p = lo + (hi - lo) * i / 3;
+            svg += `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${Y(p)}" y2="${Y(p)}"/><text x="${m.l - 10}" y="${Y(p) + 4}" text-anchor="end">${inr(p)}</text>`;
+        }
+        svg += `<text x="${m.l}" y="${H - 10}">${dFmt(t0)}</text><text x="${W - m.r}" y="${H - 10}" text-anchor="end">${dFmt(t1)}</text>`;
+
+        data.forEach(s => {
+            svg += `<polyline fill="none" stroke="${s.c}" stroke-width="3" stroke-linejoin="round" points="${s.pts.map(x => `${X(x.t)},${Y(x.p)}`).join(" ")}"/>`;
+            svg += s.pts.map(x => `<circle cx="${X(x.t)}" cy="${Y(x.p)}" r="4.5" fill="${s.c}"><title>${s.name}: ${inr(x.p)} on ${dFmt(x.t)}</title></circle>`).join("");
+        });
+
+        const wrap = h("div");
+        wrap.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Price trend vector graph">${svg}</svg>`;
+        const legend = h("div", { class: "legend" }, ...data.map(s => h("span", {}, h("i", { style: `background:${s.c}` }), `${s.name} (Min: ${inr(Math.min(...s.pts.map(x => x.p)))})`)));
+        body.replaceChildren(wrap, legend, h("p", { class: "note" }, "Trend data compiled locally from your logged prices."));
     }
+    $("#histDialog").showModal();
+}
 
-    if (!query) {
-        searchMessage.textContent =
-            "Please enter a product name or product URL.";
-        return;
-    }
+/* ---------- Automated Smooth Scroll & Search Logic ---------- */
+function search(input, fromLoad) {
+    let q;
+    try { q = parseInput(input); } catch (e) { $("#searchMessage").textContent = e.message; return; }
+    if (!q) { $("#searchMessage").textContent = "Please enter a product name or paste a link."; return; }
 
-    const detected = detectProduct(query);
+    S.query = q;
+    S.manual = null;
+    S.det = detect(q);
+    S.group = "All";
+    $("#productInput").value = q;
 
-    // Show relevant store categories first.
-    // Keep all other stores available below.
-    const orderedStores = [...stores].sort((a, b) => {
-        const aRelevant =
-            detected.storeCategories.includes(a.category) ? 0 : 1;
+    const recent = [q, ...store_.get("sd_recent", []).filter(x => x.toLowerCase() !== q.toLowerCase())].slice(0, 5);
+    store_.set("sd_recent", recent);
+    showChips();
 
-        const bRelevant =
-            detected.storeCategories.includes(b.category) ? 0 : 1;
+    try { history.replaceState(null, "", `?q=${enc(q)}`); } catch { }
+    render();
 
-        return aRelevant - bRelevant;
+    // Automatically smooth scroll right down to the comparison section
+    const resultsElem = $("#results");
+    const navHeight = document.querySelector(".navbar").offsetHeight;
+    const targetPosition = resultsElem.getBoundingClientRect().top + window.pageYOffset - navHeight - 16;
+
+    window.scrollTo({
+        top: targetPosition,
+        behavior: "smooth"
     });
-
-    resultTitle.textContent = `Stores for "${query}"`;
-    resultCount.textContent = `${orderedStores.length} stores`;
-
-    searchMessage.textContent =
-        `Detected: ${detected.category}. ${detected.message}`;
-
-    resultsContainer.replaceChildren();
-
-    orderedStores.forEach(store => {
-        resultsContainer.appendChild(
-            createStoreCard(store, detected.searchQuery)
-        );
-    });
-
-    document
-        .getElementById("results")
-        .scrollIntoView({ behavior: "smooth" });
 }
 
-searchForm.addEventListener("submit", event => {
-    event.preventDefault();
-    searchProducts(productInput.value);
-});
+function showChips() {
+    const mk = t => h("button", { class: "chip", type: "button", onclick: () => search(t) }, t);
+    $("#suggestions").replaceChildren(...["iPhone 17", "Running shoes", "Cotton shirt", "Office chair", "Smart TV"].map(mk));
+
+    const recents = store_.get("sd_recent", []);
+    const recentContainer = $("#recent");
+    if (recents.length > 0) {
+        recentContainer.hidden = false;
+        recentContainer.replaceChildren(...recents.map(mk));
+    } else {
+        recentContainer.hidden = true;
+    }
+}
+
+/* ---------- Event Listeners ---------- */
+$("#searchForm").addEventListener("submit", e => { e.preventDefault(); search($("#productInput").value); });
+$("#sortSel").addEventListener("change", e => { S.sort = e.target.value; render(); });
+$("#histClose").onclick = () => $("#histDialog").close();
+$("#histDialog").addEventListener("click", e => { if (e.target.id === "histDialog") e.target.close(); });
+
+$("#themeBtn").onclick = () => {
+    const t = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem("sd_theme", t); } catch { }
+};
+
+showChips();
+const q0 = new URLSearchParams(location.search).get("q");
+if (q0) search(q0, true);
